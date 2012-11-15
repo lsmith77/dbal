@@ -33,6 +33,11 @@ use Doctrine\DBAL\DBALException;
 class SqlitePlatform extends AbstractPlatform
 {
     /**
+     * @var bool
+     */
+    protected $supportsForeignKeyConstraints = false;
+
+    /**
      * {@inheritDoc}
      */
     public function getRegexpExpression()
@@ -285,6 +290,12 @@ class SqlitePlatform extends AbstractPlatform
             }
         }
 
+        if (isset($options['foreignKeys'])) {
+            foreach ((array) $options['foreignKeys'] as $definition) {
+                $sql[] = $this->getCreateForeignKeySQL($definition, $name);
+            }
+        }
+
         return $query;
     }
 
@@ -355,6 +366,16 @@ class SqlitePlatform extends AbstractPlatform
     }
 
     /**
+     * Dynamically enable foreign key constraint support
+     *
+     * @param bool
+     */
+    public function setForeignKeyConstraintSupport($bool)
+    {
+        $this->supportsForeignKeyConstraints = $bool;
+    }
+
+    /**
      * {@inheritDoc}
      *
      * SQLite does support foreign key constraints, but only in CREATE TABLE statements...
@@ -363,7 +384,38 @@ class SqlitePlatform extends AbstractPlatform
      */
     public function supportsForeignKeyConstraints()
     {
-        return false;
+        return $this->supportsForeignKeyConstraints;
+    }
+
+    public function getListTableForeignKeysSQL($table, $database = null)
+    {
+        $table = str_replace(".", "__", $table);
+
+        return "PRAGMA foreign_key_list($table)";
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function getAdvancedForeignKeyOptionsSQL(\Doctrine\DBAL\Schema\ForeignKeyConstraint $foreignKey)
+    {
+        $query = '';
+
+        $query .= parent::getAdvancedForeignKeyOptionsSQL($foreignKey);
+
+        if ($foreignKey->hasOption('deferrable') && $foreignKey->getOption('deferrable') !== false) {
+            $query .= ' DEFERRABLE';
+        } else {
+            $query .= ' NOT DEFERRABLE';
+        }
+
+        if ($foreignKey->hasOption('deferred') && $foreignKey->getOption('deferred') !== false) {
+            $query .= ' INITIALLY DEFERRED';
+        } else {
+            $query .= ' INITIALLY IMMEDIATE';
+        }
+
+        return $query;
     }
 
     /**

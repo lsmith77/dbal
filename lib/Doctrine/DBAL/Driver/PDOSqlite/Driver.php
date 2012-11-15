@@ -63,6 +63,12 @@ class Driver implements \Doctrine\DBAL\Driver
             $pdo->sqliteCreateFunction($fn, $data['callback'], $data['numArgs']);
         }
 
+        $result = $pdo->exec('PRAGMA foreign_keys');
+        if ($result === 0 || $result === 1) {
+            $pdo->exec('PRAGMA foreign_keys = ON;');
+            $this->getDatabasePlatform()->setForeignKeyConstraintSupport(true);
+        }
+
         return $pdo;
     }
 
